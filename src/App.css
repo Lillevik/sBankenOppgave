@@ -1,0 +1,18 @@
+.positiveValue{
+    color:forestgreen;
+}
+
+.negativeValue{
+    color: indianred;
+}
+
+.neutralValue{
+    color:cornflowerblue;
+}
+
+.fa-sort,
+.fa-sort-desc,
+.fa-sort-asc:hover{
+    cursor: pointer;
+}
+
