@@ -6,9 +6,8 @@ class App extends Component {
     constructor(props) {
         super(props);
         this.state = {
-            loading: false,
             data: {},
-            kategorier: [],
+            categories: [],
             categoryId: 0,
             sortColumn: "",
             sortKey: "",
@@ -16,23 +15,6 @@ class App extends Component {
         };
     }
 
-    updateSort = (sortKey, sortColumn) => {
-        let sortOrder = "asc";
-        if(this.state.sortOrder === "asc"){
-            sortOrder = "desc";
-        }
-        this.setState({
-            sortColumn: sortColumn,
-            sortKey: sortKey,
-            sortOrder: sortOrder
-        })
-    };
-
-    handleCategoryEvent = (e) => {
-        this.setState({
-            categoryId: parseInt(e.target.value)
-        });
-    };
 
     fetchData = (url, callback) => {
         let xhr = new XMLHttpRequest();
@@ -49,7 +31,7 @@ class App extends Component {
             "https://skbank.azurewebsites.net/api/kategori",
             (data) => {
                 this.setState({
-                    kategorier: JSON.parse(data)
+                    categories: JSON.parse(data)
                 })
             }
         );
@@ -65,51 +47,132 @@ class App extends Component {
         );
     }
 
-    render() {
+    updateSort = (sortKey, sortColumn) => {
+        let sortOrder = "asc";
+        if (this.state.sortOrder === "asc") {
+            sortOrder = "desc";
+        }
+        this.setState({
+            sortColumn: sortColumn,
+            sortKey: sortKey,
+            sortOrder: sortOrder
+        })
+    };
+
+    handleCategoryEvent = (e) => {
+        this.setState({
+            categoryId: parseInt(e.target.value)
+        });
+    };
+
+    sortTransactions = (transactions, sortKey, sortOrder) => {
+        transactions.sort((a, b) => {
+            if (sortOrder === "desc") {
+                if (a[sortKey] < b[sortKey]) {
+                    return -1;
+                }
+                if (a[sortKey] > b[sortKey]) {
+                    return 1;
+                }
+                return 0;
+            } else {
+                if (b[sortKey] < a[sortKey]) {
+                    return -1;
+                }
+                if (b[sortKey] > a[sortKey]) {
+                    return 1;
+                }
+                return 0;
+            }
+        })
+    };
+
+    sumTotals = (transactions) => {
         let innTotal = 0;
         let outTotal = 0;
-        let transaksjoner = this.state.data.transaksjoner;
-        let kategorier = this.state.kategorier;
-        let data = this.state.data;
-        let sortKey = this.state.sortKey;
-        let sortOrder = this.state.sortOrder;
-        let sortColumn = this.state.sortColumn;
+        transactions.forEach((trans) => {
+            let value = trans.beloep;
+            if (value >= 0) {
+                innTotal += value;
+            } else {
+                outTotal += value;
+            }
+        });
+        return {innTotal: innTotal, outTotal: outTotal}
+    };
 
-        if (this.state.categoryId && transaksjoner) {
-            transaksjoner = transaksjoner.filter(trans =>
+    filterTransactions = (transacations) => {
+        if (this.state.categoryId) {
+            return transacations.filter(trans =>
                 trans.kategoriID === this.state.categoryId
             )
         }
+        return transacations
+    };
 
-        if (transaksjoner) {
-            transaksjoner.forEach((trans) => {
-                let value = trans.beloep;
-                if (value >= 0) {
-                    innTotal += value;
-                } else {
-                    outTotal += value;
-                }
-            });
+    renderTransactionRows = (transactions) => {
+        return transactions.map((trans) => {
+            return (
+                <tr key={trans.transaksjonsID}>
+                    <td>{trans.dato}</td>
+                    <td>{trans.beskrivelse}</td>
+                    <td className={"positiveValue"}>{(trans.beloep >= 0 && trans.beloep)}</td>
+                    <td className={"negativeValue"}>{(trans.beloep < 0 && trans.beloep)}</td>
+                </tr>
+            )
+        })
+    };
 
-            transaksjoner.sort((a, b) => {
-                if(sortOrder === "desc"){
-                    if(a[sortKey] < b[sortKey]) {
-                        return -1;
-                    }
-                    if(a[sortKey] > b[sortKey]) {
-                        return 1;
-                    }
-                    return 0;
-                }else{
-                    if(b[sortKey] < a[sortKey]) {
-                        return -1;
-                    }
-                    if(b[sortKey] > a[sortKey]) {
-                        return 1;
-                    }
-                    return 0;
+    renderTransactionHeader = (sortColumn, sortOrder) => {
+        return (
+            <tr>
+                <td>Dato <i
+                    className={"fa fa-fw " + (sortColumn === "dato" ? "fa-sort-" + sortOrder : "fa-sort")}
+                    onClick={this.updateSort.bind(this, "dato", "dato")}/></td>
+                <td>Beskrivelse <i
+                    className={"fa fa-fw " + (sortColumn === "beskrivelse" ? "fa-sort-" + sortOrder : "fa-sort")}
+                    onClick={this.updateSort.bind(this, "beskrivelse", "beskrivelse")}/></td>
+                <td>Inn <i
+                    className={"fa fa-fw " + (sortColumn === "inn" ? "fa-sort-" + sortOrder : "fa-sort")}
+                    onClick={this.updateSort.bind(this, "beloep", "inn")}/></td>
+                <td>Ut <i
+                    className={"fa fa-fw " + (sortColumn === "ut" ? "fa-sort-" + sortOrder : "fa-sort")}
+                    onClick={this.updateSort.bind(this, "beloep", "ut")}/></td>
+            </tr>
+        )
+    };
+
+    renderCategories = (categories) => {
+        return (
+            <select onChange={this.handleCategoryEvent}>
+                <option value={0}>Velg Kategori</option>
+                {
+                    (categories.map((kat) => {
+                        return (
+                            <option key={kat.kategoriID} value={kat.kategoriID}>{kat.beskrivelse}</option>
+                        )
+                    }))
                 }
-            })
+            </select>
+        )
+    };
+
+    render() {
+        let totals = {
+            innTotal: 0,
+            outTotal: 0
+        };
+        let transactions = this.state.data.transaksjoner;
+        const categories = this.state.categories;
+        const data = this.state.data;
+        const sortKey = this.state.sortKey;
+        const sortOrder = this.state.sortOrder;
+        const sortColumn = this.state.sortColumn;
+
+        if (transactions) {
+            transactions = this.filterTransactions(transactions);
+                totals = this.sumTotals(transactions);
+            this.sortTransactions(transactions, sortKey, sortOrder);
         }
 
         return (
@@ -117,47 +180,22 @@ class App extends Component {
                 <div className={"kontoinformasjon pb-3"}>
                     <h3>xBanken</h3>
                     <p>Kontonavn: <span>{data.kontonavn}</span></p>
-                    <p>Saldo: <span className={(data.saldo < 0 ? "negativeValue" : "neutralValue")}>{data.saldo}</span></p>
-                    <select onChange={this.handleCategoryEvent}>
-                        <option value={0}>Velg Kategori</option>
-                        {(kategorier && kategorier.map((kat) => {
-                            return (
-                                <option key={kat.kategoriID} value={kat.kategoriID}>{kat.beskrivelse}</option>
-                            )
-                        }))}
-                    </select>
+                    <p>Saldo: <span className={(data.saldo < 0 ? "negativeValue" : "neutralValue")}>{data.saldo}</span>
+                    </p>
+                    {(categories && this.renderCategories(categories))}
                 </div>
                 <div className={"transaksjoner"}>
                     <table className={"table table-striped border"}>
                         <thead>
-                        <tr>
-                            <td>Dato <i className={"fa fa-fw " + (sortColumn === "dato" ? "fa-sort-" + sortOrder : "fa-sort")}
-                                        onClick={this.updateSort.bind(this, "dato", "dato")}/></td>
-                            <td>Beskrivelse <i className={"fa fa-fw " + (sortColumn === "beskrivelse" ? "fa-sort-" + sortOrder : "fa-sort")}
-                                               onClick={this.updateSort.bind(this, "beskrivelse", "beskrivelse")}/></td>
-                            <td>Inn <i className={"fa fa-fw " + (sortColumn === "inn" ? "fa-sort-" + sortOrder : "fa-sort")}
-                                       onClick={this.updateSort.bind(this, "beloep", "inn")}/></td>
-                            <td>Ut <i className={"fa fa-fw " + (sortColumn === "ut" ? "fa-sort-" + sortOrder : "fa-sort")}
-                                      onClick={this.updateSort.bind(this, "beloep", "ut")}/></td>
-                        </tr>
+                        {(categories && this.renderTransactionHeader(sortColumn, sortOrder))}
                         </thead>
                         <tbody>
-                        {(transaksjoner && transaksjoner.map((trans) => {
-                            return (
-                                <tr key={trans.transaksjonsID}>
-                                    <td>{trans.dato}</td>
-                                    <td>{trans.beskrivelse}</td>
-                                    <td className={"positiveValue"}>{(trans.beloep >= 0 && trans.beloep)}</td>
-                                    <td className={"negativeValue"}>{(trans.beloep < 0 && trans.beloep)}</td>
-                                </tr>
-                            )
-                        }))
-                        }
+                        {(transactions && this.renderTransactionRows(transactions))}
                         </tbody>
                     </table>
                     <div className={"sum pt-2"}>
-                        <p>Sum inn: <span className={"positiveValue"}>{innTotal.toFixed(2)}</span></p>
-                        <p>Sum ut: <span className={"negativeValue"}>{outTotal.toFixed(2)}</span></p>
+                        <p>Sum inn: <span className={"positiveValue"}>{totals.innTotal.toFixed(2)}</span></p>
+                        <p>Sum ut: <span className={"negativeValue"}>{totals.outTotal.toFixed(2)}</span></p>
                     </div>
                 </div>
             </div>
